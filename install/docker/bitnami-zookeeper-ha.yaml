@@ -1,5 +1,3 @@
-# bitnami kafka, 基于zookeeper, 运行3个broker实例, 所有broker实例对容器外开放端口访问 (高可用)
-# 客户端访问 bootstrap.servers=localhost:29092,localhost:39092,localhost:49092
 services:
   zookeeper:
     container_name: zookeeper
