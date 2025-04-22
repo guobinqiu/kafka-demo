@@ -68,7 +68,7 @@ func main() {
 				log.Printf("Consumer exiting...")
 				done <- struct{}{}
 				return
-				//default:
+				// default:
 				// msg, err := consumer.ReadMessage(-1) // 阻塞直到消息到达 这样永远没有机会执行到 case <-ctx.Done()
 				// if err != nil {
 				// 	log.Printf("ReadMessage error: %v", err)
@@ -76,7 +76,7 @@ func main() {
 				// }
 
 				//event := consumer.Poll(100) // 非阻塞轮询消息 还是没有走到 case <-ctx.Done() 还是阻塞的 阻塞100ms
-			case <-time.After(100 * time.Millisecond):
+			case <-time.After(100 * time.Millisecond): // 为防止CPU空转 自定义轮询间隔
 				event := consumer.Poll(0) // 完全不阻塞
 				if event == nil {
 					continue
@@ -97,31 +97,40 @@ func main() {
 					}
 
 					// 幂等校验
-					res, err := db.Exec(`INSERT OR IGNORE INTO consumed_messages (id) VALUES (?)`, m.ID)
-					if err != nil {
-						log.Printf("DB insert error: %v", err)
+					var existingID string
+					err := db.QueryRow(`SELECT id FROM consumed_messages WHERE id = ?`, m.ID).Scan(&existingID)
+					if err != nil && err != sql.ErrNoRows {
+						log.Printf("DB query error: %v", err)
 						continue
 					}
-
-					rowsAffected, err := res.RowsAffected()
-					if err != nil {
-						log.Printf("DB RowsAffected error: %v", err)
-						continue
-					}
-					if rowsAffected == 0 {
+					if existingID != "" {
 						log.Printf("Duplicate message skipped (ID=%s, content=%s)", m.ID, m.Content)
 						continue
 					}
 
+					// 开启事务
+					tx, _ := db.Begin()
+
 					// 处理消息
 					log.Printf("Consumed message: %s", m.Content)
+
+					// 处理成功后再写入幂等表
+					_, err = tx.Exec(`INSERT INTO consumed_messages (id) VALUES (?)`, m.ID)
+					if err != nil {
+						log.Printf("DB insert error: %v", err)
+						_ = tx.Rollback()
+						continue
+					}
 
 					// 成功处理消息后提交偏移量
 					if _, err := consumer.CommitMessage(msg); err != nil {
 						log.Printf("Commit error: %v", err)
+						_ = tx.Rollback()
+						continue
 					}
-				case kafka.Error:
-					log.Printf("Kafka error: %v", msg)
+
+					// 提交事务
+					_ = tx.Commit()
 				default:
 					// 忽略其他事件
 				}
