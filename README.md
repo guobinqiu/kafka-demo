@@ -52,7 +52,7 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 ```
 
-### apache kafka多实例 基于kraft 官方配置
+### apache kafka多实例 基于kraft `官方配置`
 
 更加高可用但也需要更多节点
  
