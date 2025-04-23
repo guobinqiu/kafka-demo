@@ -2,6 +2,10 @@
 
 ## 安装
 
+```
+docker compose -f install/docker/xxx.yaml > up -d
+```
+
 ### apache kafka多实例 基于kraft
 
 ```
