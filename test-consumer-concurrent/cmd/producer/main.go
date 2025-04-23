@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/guobinqiu/kafka-demo/test-exactly-once/internal/message"
+	"github.com/guobinqiu/kafka-demo/test-consumer-concurrent/internal/message"
 )
 
 func main() {

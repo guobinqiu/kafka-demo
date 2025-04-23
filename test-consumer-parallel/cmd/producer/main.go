@@ -9,15 +9,15 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/guobinqiu/kafka-demo/test-consumer-parallel/cmd/internal/message"
+	"github.com/guobinqiu/kafka-demo/test-consumer-parallel/internal/message"
 )
 
 func main() {
 	var (
 		topicName         = "test"
 		numPartitions     = 3
-		replicationFactor = 3 // 副本数小于等于broker数量
-		numMessages       = 10
+		replicationFactor = 1 // 副本数小于等于broker数量
+		numMessages       = 9
 
 		// Kafka 配置
 		config = &kafka.ConfigMap{
