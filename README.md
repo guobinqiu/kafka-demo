@@ -1,6 +1,6 @@
 # Kafka Demo
 
-## 安装
+## docker 安装
 
 ```
 docker compose -f install/docker/xxx.yaml > up -d
@@ -354,7 +354,6 @@ services:
 ```
 docker run -it -d --network docker_default -p 8080:8080 -e DYNAMIC_CONFIG_ENABLED=true provectuslabs/kafka-ui
 ```
-
 
 ## 验证
 
