@@ -395,15 +395,23 @@ Kafka 中实现不同语义的配置方式：
 
 ## 验证
 
-Note:
+1. 测试前确保没有脏数据，删除一下sqlite的db文件，或者重启一下docker容器，容器没有做数据持久化，重启便可清除
+2. 消费端处理每条消息加了1秒的延迟
+3. 注释掉事务部分就是最多一次，放开事务部分就是精确一次
 
-1.测试前确保没有脏数据, 删除一下sqlite的db文件, 或者重启一下docker容器, 容器没有做数据持久化, 重启便可清除. 
+事务部分
 
-2.处理每条消息加了1秒的延迟
+```
+producer.InitTransactions(ctx)
+producer.BeginTransaction()
+producer.AbortTransaction(ctx)
+producer.CommitTransaction(ctx)
+```
 
 ### test-exactly-once
 
 - [x] 精确一次
+- [x] 最多一次
 - [x] 消费9条消息需要9秒
 - [x] 优雅退出
 
@@ -418,6 +426,7 @@ go run cmd/producer/main.go
 验证消费者并行的处理消息
 
 - [x] 精确一次
+- [x] 最多一次
 - [x] 消费9条数据需要3秒
 - [x] 优雅退出
 
@@ -432,6 +441,7 @@ go run cmd/producer/main.go
 验证3费者并行的处理消息的同时每个消费者内部并发的处理消息
 
 - [x] 精确一次
+- [x] 最多一次
 - [x] 消费9条数据需要1秒
 - [x] 优雅退出
 
