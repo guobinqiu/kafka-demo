@@ -46,7 +46,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error creating producer: %v", err)
 	}
-	// defer producer.Close()
+	defer producer.Close()
 
 	// err = producer.InitTransactions(ctx)
 	// if err != nil {
