@@ -2,6 +2,10 @@
 
 ## docker 安装
 
+> https://github.com/guobinqiu/kafka-demo/tree/main/install/docker
+
+运行
+
 ```
 docker compose -f install/docker/xxx.yaml > up -d
 ```
