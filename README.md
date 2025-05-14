@@ -450,3 +450,7 @@ cd test-consumer-concurrent
 go run cmd/consumer/main.go
 go run cmd/producer/main.go
 ```
+
+## 它的邻居 RabbitMQ
+
+> https://github.com/guobinqiu/rabbitmq-demo
