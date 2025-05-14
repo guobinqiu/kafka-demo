@@ -58,26 +58,6 @@ func main() {
 
 	var wg sync.WaitGroup
 
-	// 监听消息的发送结果
-	go func() {
-		for msg := range deliveryChan {
-			m := msg.(*kafka.Message)
-			if m.TopicPartition.Error != nil {
-				// 发送失败，打印消息并回滚事务
-				// 这里你可以发送到死信队列 或做业务层面重试逻辑 或其他兜底机制
-				log.Printf("Delivery failed (topic: %s, partition: %d, offset: %d, error: %v)",
-					*m.TopicPartition.Topic, m.TopicPartition.Partition, m.TopicPartition.Offset, m.TopicPartition.Error)
-				// _ = producer.AbortTransaction(ctx)
-			} else {
-				// 发送成功，打印消息并提交事务
-				log.Printf("Message delivered (topic: %s, partition: %d, offset: %d, key: %s, value: %s)",
-					*m.TopicPartition.Topic, m.TopicPartition.Partition, m.TopicPartition.Offset, string(m.Key), string(m.Value))
-				// _ = producer.CommitTransaction(ctx)
-			}
-			wg.Done()
-		}
-	}()
-
 	for i := 0; i < numMessages; i++ {
 		message := message.Message{
 			ID: fmt.Sprintf("%d", i+1), //消息唯一ID, 给消费端做幂等用
@@ -108,6 +88,36 @@ func main() {
 		}
 		wg.Add(1)
 	}
+
+	// 监听消息的发送结果
+	go func() {
+		for msg := range deliveryChan {
+			m := msg.(*kafka.Message)
+			if m.TopicPartition.Error != nil {
+				// 发送失败，打印消息并回滚事务
+				// 这里你可以发送到死信队列 或做业务层面重试逻辑 或其他兜底机制
+				log.Printf("Delivery failed (topic: %s, partition: %d, offset: %d, error: %v)",
+					*m.TopicPartition.Topic,
+					m.TopicPartition.Partition,
+					m.TopicPartition.Offset,
+					m.TopicPartition.Error,
+				)
+				// _ = producer.AbortTransaction(ctx)
+			} else {
+				// 发送成功，打印消息并提交事务
+				log.Printf("Message delivered (topic: %s, partition: %d, offset: %d, key: %s, value: %s)",
+					*m.TopicPartition.Topic,
+					m.TopicPartition.Partition,
+					m.TopicPartition.Offset,
+					string(m.Key),
+					string(m.Value),
+				)
+				// _ = producer.CommitTransaction(ctx)
+			}
+			wg.Done()
+		}
+	}()
+
 	wg.Wait()
 	close(deliveryChan)
 }
