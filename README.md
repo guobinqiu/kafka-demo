@@ -417,7 +417,7 @@ go run cmd/producer/main.go
 
 ### test-consumer-parallel
 
-验证3个消费者进程并行处理消息 (每个进程一个消费者实例)
+3个消费者进程并行处理消息 (每个进程一个消费者实例)
 
 ```
 cd test-consumer-parallel
@@ -429,7 +429,7 @@ go run cmd/producer/main.go
 
 ### test-consumer-concurrent
 
-验证一个进程内3个消费者实例并发的处理消息
+一个进程内3个消费者实例并发的处理消息
 
 ```
 cd test-consumer-concurrent
@@ -439,7 +439,7 @@ go run cmd/producer/main.go
 
 ### test-consumer-concurrent-hpc
 
-验证一个进程内3个消费者实例并发处理消息的同时每个消费者实例内部再并发的处理消息
+一个进程内3个消费者实例并发处理消息的同时每个消费者实例内部再并发的处理消息
 
 ```
 cd test-consumer-concurrent-hpc
