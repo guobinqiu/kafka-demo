@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/guobinqiu/kafka-demo/test-exactly-once/internal/message"
+	"github.com/guobinqiu/kafka-demo/test-at-least-once/internal/message"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -21,12 +21,12 @@ const (
 
 // Kafka 配置
 var config = &kafka.ConfigMap{
-	"bootstrap.servers":  "127.0.0.1:29092,127.0.0.1:39092,127.0.0.1:49092", // Kafka 集群地址（多个 broker 提高容错能力）
-	"group.id":           "go-consumer-group",                               // 消费者所属的消费组 ID，Kafka 用这个来做分区协调、偏移量管理等。
-	"auto.offset.reset":  "latest",                                          //"latest" 表示从最新的消息开始消费；"earliest" 表示从最旧的消息开始消费。
-	"security.protocol":  "PLAINTEXT",                                       // 安全协议类型。 "PLAINTEXT" 表示不加密、无认证的明文通信；还可以设置为 "SSL"、"SASL_PLAINTEXT"、"SASL_SSL" 等
-	"isolation.level":    "read_committed",                                  // 如果使用了事务生产者，并希望只读取已提交的消息
-	"enable.auto.commit": false,                                             // 禁用自动提交
+	"bootstrap.servers": "127.0.0.1:29092,127.0.0.1:39092,127.0.0.1:49092", // Kafka 集群地址（多个 broker 提高容错能力）
+	"group.id":          "go-consumer-group",                               // 消费者所属的消费组 ID，Kafka 用这个来做分区协调、偏移量管理等。
+	"auto.offset.reset": "latest",                                          //"latest" 表示从最新的消息开始消费；"earliest" 表示从最旧的消息开始消费。
+	"security.protocol": "PLAINTEXT",                                       // 安全协议类型。 "PLAINTEXT" 表示不加密、无认证的明文通信；还可以设置为 "SSL"、"SASL_PLAINTEXT"、"SASL_SSL" 等
+	// "isolation.level":    "read_committed",                                  // 如果使用了事务生产者，并希望只读取已提交的消息
+	"enable.auto.commit": false, // 禁用自动提交
 }
 
 func main() {

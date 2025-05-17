@@ -12,13 +12,14 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/guobinqiu/kafka-demo/test-consumer-concurrent/internal/message"
+	"github.com/guobinqiu/kafka-demo/test-consumer-concurrent-hpc/internal/message"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
-	topicName   = "test-consumer-concurrent"
+	topicName   = "test-consumer-concurrent-hpc"
 	consumerNum = 3 // 无论并发还是并行 消费者实例要小于等于分区数 (producer.numPartitions)
+	jobNum      = 3 // 更高性能的内部并发
 )
 
 // Kafka 配置
@@ -52,10 +53,11 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	var wg sync.WaitGroup
+	// 优雅退出 不能马上中止 要等worker协程把剩下的那点事情干完再退
+	var workerWg sync.WaitGroup
 
 	for i := 0; i < consumerNum; i++ {
-		go startConsumer(ctx, db, i, &wg)
+		go startConsumer(ctx, db, i, &workerWg)
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -65,12 +67,13 @@ func main() {
 	log.Println("Shutting down...")
 	cancel() // 触发ctx.Done()
 
-	wg.Wait()
+	workerWg.Wait()
 	log.Println("All consumers exited.")
 }
 
-func startConsumer(ctx context.Context, db *sql.DB, workerID int, wg *sync.WaitGroup) {
-	defer wg.Done()
+// worker协程, 它是main的子协程
+func startConsumer(ctx context.Context, db *sql.DB, workerID int, workerWg *sync.WaitGroup) {
+	defer workerWg.Done()
 
 	consumer, err := kafka.NewConsumer(config)
 	if err != nil {
@@ -87,10 +90,24 @@ func startConsumer(ctx context.Context, db *sql.DB, workerID int, wg *sync.WaitG
 
 	log.Printf("[Worker %d] Consumer started...", workerID)
 
+	// 把worker协程读取的消息发送给job协程
+	msgChan := make(chan *kafka.Message, 100)
+
+	// 优雅退出 不能马上中止 要等job协程把剩下的那点事情干完再退
+	var jobWg sync.WaitGroup
+
+	// 多个job协程并发处理消息
+	for i := 0; i < jobNum; i++ {
+		jobWg.Add(1)
+		go startJob(consumer, msgChan, db, workerID, i, &jobWg)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			log.Printf("[Worker %d] exiting...", workerID)
+			close(msgChan)
+			jobWg.Wait()
 			return
 		// default:
 		// msg, err := consumer.ReadMessage(-1) // 阻塞直到消息到达 这样永远没有机会执行到 case <-ctx.Done()
@@ -108,57 +125,66 @@ func startConsumer(ctx context.Context, db *sql.DB, workerID int, wg *sync.WaitG
 
 			switch msg := event.(type) {
 			case *kafka.Message:
-				var m message.Message
-				if err := json.Unmarshal(msg.Value, &m); err != nil {
-					log.Printf("[Worker %d] JSON error: %v", workerID, err)
-					continue
-				}
-
-				// ID 作为唯一标识
-				if m.ID == "" {
-					log.Printf("[Worker %d] Empty message ID, skipped", workerID)
-					continue
-				}
-
-				// 幂等校验
-				var existingID string
-				err := db.QueryRow(`SELECT id FROM consumed_messages WHERE id = ?`, m.ID).Scan(&existingID)
-				if err != nil && err != sql.ErrNoRows {
-					log.Printf("[Worker %d] DB query error: %v", workerID, err)
-					continue
-				}
-				if existingID != "" {
-					log.Printf("[Worker %d] Duplicate message skipped (ID=%s, content=%s)", workerID, m.ID, m.Content)
-					continue
-				}
-
-				// 开启事务
-				tx, _ := db.Begin()
-
-				// 处理消息
-				log.Printf("[Worker %d] Consumed message: %s", workerID, m.Content)
-				time.Sleep(time.Second)
-
-				// 处理成功后再写入幂等表
-				_, err = tx.Exec(`INSERT INTO consumed_messages (id) VALUES (?)`, m.ID)
-				if err != nil {
-					log.Printf("[Worker %d] DB insert error: %v", workerID, err)
-					_ = tx.Rollback()
-					continue
-				}
-
-				// 成功处理消息后提交偏移量
-				if _, err := consumer.CommitMessage(msg); err != nil {
-					log.Printf("[Worker %d] Commit error: %v", workerID, err)
-					_ = tx.Rollback()
-					continue
-				}
-
-				// 提交事务
-				_ = tx.Commit()
+				msgChan <- msg
 			default:
 				// 忽略其他事件
 			}
 		}
+	}
+}
+
+// job协程, 它是worker的子协程
+func startJob(consumer *kafka.Consumer, msgChan chan *kafka.Message, db *sql.DB, workerID int, jobID int, jobWg *sync.WaitGroup) {
+	defer jobWg.Done()
+
+	for msg := range msgChan {
+		var m message.Message
+		if err := json.Unmarshal(msg.Value, &m); err != nil {
+			log.Printf("[Worker %d][Job %d] JSON error: %v", workerID, jobID, err)
+			continue
+		}
+
+		// ID 作为唯一标识
+		if m.ID == "" {
+			log.Printf("[Worker %d][Job %d] Empty message ID, skipped", workerID, jobID)
+			continue
+		}
+
+		// 幂等校验
+		var existingID string
+		err := db.QueryRow(`SELECT id FROM consumed_messages WHERE id = ?`, m.ID).Scan(&existingID)
+		if err != nil && err != sql.ErrNoRows {
+			log.Printf("[Worker %d][Job %d] DB query error: %v", workerID, jobID, err)
+			continue
+		}
+		if existingID != "" {
+			log.Printf("[Worker %d][Job %d] Duplicate message skipped (ID=%s, content=%s)", workerID, jobID, m.ID, m.Content)
+			continue
+		}
+
+		// 开启事务
+		tx, _ := db.Begin()
+
+		// 处理消息
+		log.Printf("[Worker %d][Job %d] Consumed message: %s", workerID, jobID, m.Content)
+		time.Sleep(time.Second)
+
+		// 处理成功后再写入幂等表
+		_, err = tx.Exec(`INSERT INTO consumed_messages (id) VALUES (?)`, m.ID)
+		if err != nil {
+			log.Printf("[Worker %d][Job %d] DB insert error: %v", workerID, jobID, err)
+			_ = tx.Rollback()
+			continue
+		}
+
+		// 成功处理消息后提交偏移量
+		if _, err := consumer.CommitMessage(msg); err != nil {
+			log.Printf("[Worker %d][Job %d] Commit error: %v", workerID, jobID, err)
+			_ = tx.Rollback()
+			continue
+		}
+
+		// 提交事务
+		_ = tx.Commit()
 	}
 }

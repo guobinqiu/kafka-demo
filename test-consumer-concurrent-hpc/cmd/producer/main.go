@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/guobinqiu/kafka-demo/test-consumer-concurrent/internal/message"
+	"github.com/guobinqiu/kafka-demo/test-consumer-concurrent-hpc/internal/message"
 )
 
 const (
@@ -18,7 +18,7 @@ const (
 	numMessages       = 9
 )
 
-var topicName = "test-consumer-concurrent"
+var topicName = "test-consumer-concurrent-hpc"
 
 func main() {
 	// Kafka 配置

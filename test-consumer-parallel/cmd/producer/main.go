@@ -12,24 +12,25 @@ import (
 	"github.com/guobinqiu/kafka-demo/test-consumer-parallel/internal/message"
 )
 
-func main() {
-	var (
-		topicName         = "test"
-		numPartitions     = 3
-		replicationFactor = 1 // 副本数小于等于broker数量
-		numMessages       = 9
+const (
+	numPartitions     = 3 // 分区数
+	replicationFactor = 1 // 副本数小于等于broker数量
+	numMessages       = 9
+)
 
-		// Kafka 配置
-		config = &kafka.ConfigMap{
-			"bootstrap.servers":   "127.0.0.1:29092,127.0.0.1:39092,127.0.0.1:49092", // Kafka 集群地址（多个 broker 提高容错能力）
-			"acks":                "all",                                             // all 表示所有 ISR（In-Sync Replicas）都确认后才认为发送成功，确保数据可靠性
-			"enable.idempotence":  "true",                                            // 开启幂等性
-			"retries":             5,                                                 // 重试次数（发送失败后重试），适用于短暂的错误（如网络闪断、leader 切换等瞬时问题）
-			"retry.backoff.ms":    1000,                                              // 两次重试之间的时间间隔（毫秒）
-			"delivery.timeout.ms": 30000,                                             // 发送一条消息的总时间限制 包含重试次数时间
-			// "transactional.id":    "t1",                                              // 如需严格的端到端 Exactly-Once 可以放开事务相关的注释
-		}
-	)
+var topicName = "test-consumer-parallel"
+
+func main() {
+	// Kafka 配置
+	config := &kafka.ConfigMap{
+		"bootstrap.servers":   "127.0.0.1:29092,127.0.0.1:39092,127.0.0.1:49092", // Kafka 集群地址（多个 broker 提高容错能力）
+		"acks":                "all",                                             // all 表示所有 ISR（In-Sync Replicas）都确认后才认为发送成功，确保数据可靠性
+		"enable.idempotence":  "true",                                            // 开启幂等性
+		"retries":             5,                                                 // 重试次数（发送失败后重试），适用于短暂的错误（如网络闪断、leader 切换等瞬时问题）
+		"retry.backoff.ms":    1000,                                              // 两次重试之间的时间间隔（毫秒）
+		"delivery.timeout.ms": 30000,                                             // 发送一条消息的总时间限制 包含重试次数时间
+		// "transactional.id":    "t1",                                              // 如需严格的端到端 Exactly-Once 可以放开事务相关的注释
+	}
 
 	// 创建 Kafka AdminClient 用于创建 topic
 	adminClient, err := kafka.NewAdminClient(config)

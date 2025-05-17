@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/guobinqiu/kafka-demo/test-consumer-concurrent/internal/message"
+	"github.com/guobinqiu/kafka-demo/test-at-least-once/internal/message"
 )
 
 const (
@@ -18,7 +18,7 @@ const (
 	numMessages       = 9
 )
 
-var topicName = "test-consumer-concurrent"
+var topicName = "test-exactly-once"
 
 func main() {
 	// Kafka 配置
@@ -49,10 +49,10 @@ func main() {
 	}
 	defer producer.Close()
 
-	// err = producer.InitTransactions(ctx)
-	// if err != nil {
-	// 	log.Fatalf("Failed to initialize transactions: %v", err)
-	// }
+	err = producer.InitTransactions(ctx)
+	if err != nil {
+		log.Fatalf("Failed to initialize transactions: %v", err)
+	}
 
 	// 使用 deliveryChan 接收发送消息的结果
 	deliveryChan := make(chan kafka.Event, numMessages)
@@ -84,7 +84,7 @@ func main() {
 
 		if err != nil {
 			log.Printf("Error producing message: %v", err)
-			// _ = producer.AbortTransaction(ctx)
+			_ = producer.AbortTransaction(ctx)
 			continue
 		}
 		wg.Add(1)

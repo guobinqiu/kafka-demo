@@ -12,24 +12,25 @@ import (
 	"github.com/guobinqiu/kafka-demo/test-exactly-once/internal/message"
 )
 
-func main() {
-	var (
-		topicName         = "test"
-		numPartitions     = 3
-		replicationFactor = 1 // 副本数小于等于broker数量
-		numMessages       = 9
+const (
+	numPartitions     = 3 // 分区数
+	replicationFactor = 1 // 副本数小于等于broker数量
+	numMessages       = 9
+)
 
-		// Kafka 配置
-		config = &kafka.ConfigMap{
-			"bootstrap.servers":   "127.0.0.1:29092,127.0.0.1:39092,127.0.0.1:49092", // Kafka 集群地址（多个 broker 提高容错能力）
-			"acks":                "all",                                             // all 表示所有 ISR（In-Sync Replicas）都确认后才认为发送成功，确保数据可靠性
-			"enable.idempotence":  "true",                                            // 开启幂等性
-			"retries":             5,                                                 // 重试次数（发送失败后重试），适用于短暂的错误（如网络闪断、leader 切换等瞬时问题）
-			"retry.backoff.ms":    1000,                                              // 两次重试之间的时间间隔（毫秒）
-			"delivery.timeout.ms": 30000,                                             // 发送一条消息的总时间限制 包含重试次数时间
-			// "transactional.id":    "t1",                                              // 如需严格的端到端 Exactly-Once 可以放开事务相关的注释
-		}
-	)
+var topicName = "test-exactly-once"
+
+func main() {
+	// Kafka 配置
+	config := &kafka.ConfigMap{
+		"bootstrap.servers":   "127.0.0.1:29092,127.0.0.1:39092,127.0.0.1:49092", // Kafka 集群地址（多个 broker 提高容错能力）
+		"acks":                "all",                                             // all 表示所有 ISR（In-Sync Replicas）都确认后才认为发送成功，确保数据可靠性
+		"enable.idempotence":  "true",                                            // 开启幂等性
+		"retries":             5,                                                 // 重试次数（发送失败后重试），适用于短暂的错误（如网络闪断、leader 切换等瞬时问题）
+		"retry.backoff.ms":    1000,                                              // 两次重试之间的时间间隔（毫秒）
+		"delivery.timeout.ms": 30000,                                             // 发送一条消息的总时间限制 包含重试次数时间
+		"transactional.id":    "t1",                                              // 如需严格的端到端 Exactly-Once 可以放开事务相关的注释
+	}
 
 	// 创建 Kafka AdminClient 用于创建 topic
 	adminClient, err := kafka.NewAdminClient(config)
@@ -48,10 +49,10 @@ func main() {
 	}
 	defer producer.Close()
 
-	// err = producer.InitTransactions(ctx)
-	// if err != nil {
-	// 	log.Fatalf("Failed to initialize transactions: %v", err)
-	// }
+	err = producer.InitTransactions(ctx)
+	if err != nil {
+		log.Fatalf("Failed to initialize transactions: %v", err)
+	}
 
 	// 使用 deliveryChan 接收发送消息的结果
 	deliveryChan := make(chan kafka.Event, numMessages)
@@ -71,7 +72,7 @@ func main() {
 			continue
 		}
 
-		// _ = producer.BeginTransaction()
+		_ = producer.BeginTransaction()
 
 		// 发送消息 (异步)
 		err = producer.Produce(&kafka.Message{
@@ -83,7 +84,7 @@ func main() {
 
 		if err != nil {
 			log.Printf("Error producing message: %v", err)
-			// _ = producer.AbortTransaction(ctx)
+			_ = producer.AbortTransaction(ctx)
 			continue
 		}
 		wg.Add(1)
@@ -102,7 +103,7 @@ func main() {
 					m.TopicPartition.Offset,
 					m.TopicPartition.Error,
 				)
-				// _ = producer.AbortTransaction(ctx)
+				_ = producer.AbortTransaction(ctx)
 			} else {
 				// 发送成功，打印消息并提交事务
 				log.Printf("Message delivered (topic: %s, partition: %d, offset: %d, key: %s, value: %s)",
@@ -112,7 +113,7 @@ func main() {
 					string(m.Key),
 					string(m.Value),
 				)
-				// _ = producer.CommitTransaction(ctx)
+				_ = producer.CommitTransaction(ctx)
 			}
 			wg.Done()
 		}
