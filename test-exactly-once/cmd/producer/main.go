@@ -29,7 +29,7 @@ func main() {
 		"retries":             5,                                                 // 重试次数（发送失败后重试），适用于短暂的错误（如网络闪断、leader 切换等瞬时问题）
 		"retry.backoff.ms":    1000,                                              // 两次重试之间的时间间隔（毫秒）
 		"delivery.timeout.ms": 30000,                                             // 发送一条消息的总时间限制 包含重试次数时间
-		"transactional.id":    "t1",                                              // 如需严格的端到端 Exactly-Once 可以放开事务相关的注释
+		"transactional.id":    "t1",                                              // 启用事务，id要唯一
 	}
 
 	// 创建 Kafka AdminClient 用于创建 topic
